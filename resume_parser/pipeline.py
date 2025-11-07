@@ -6,9 +6,8 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from . import ingestion, inference, layout_utils, postprocessing
-from .schema import ResumeOutput
-from .types import DocumentContent
+from . import ingestion, inference, postprocessing
+from .types import DocumentContent, ParsedResume
 
 LOGGER = logging.getLogger(__name__)
 
@@ -28,10 +27,6 @@ class ResumeParser:
     def load_document(self, file_path: str) -> DocumentContent:
         LOGGER.info("Ingesting document %s", file_path)
         document = ingestion.ingest_document(file_path, self.ingestion_config)
-        ingestion.normalize_document_bboxes(document, self.ingestion_config.bbox_scale)
-        ingestion.remove_headers_footers(document)
-        layout_utils.assign_columns(document)
-        layout_utils.reorder_document_tokens(document)
         LOGGER.debug("Loaded %s tokens", len(document.tokens))
         return document
 
@@ -41,20 +36,19 @@ class ResumeParser:
         LOGGER.debug("Obtained %s token embeddings", len(embeddings))
         return embeddings
 
-    def post_process(self, document: DocumentContent, embeddings) -> ResumeOutput:
+    def post_process(self, document: DocumentContent, embeddings) -> ParsedResume:
         LOGGER.info("Linking entities into structured resume")
         resume = postprocessing.link_entities(document, embeddings)
         return resume
 
-    def parse(self, file_path: str) -> ResumeOutput:
+    def parse(self, file_path: str) -> ParsedResume:
         document = self.load_document(file_path)
         embeddings = self.run_inference(document)
         return self.post_process(document, embeddings)
 
 
-def parse_resume(file_path: str) -> dict:
+def parse_resume(file_path: str) -> ParsedResume:
     """Convenience function to parse a resume into structured JSON."""
 
     parser = ResumeParser()
-    resume = parser.parse(str(Path(file_path).expanduser().resolve()))
-    return resume.to_dict()
+    return parser.parse(str(Path(file_path).expanduser().resolve()))

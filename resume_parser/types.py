@@ -65,6 +65,18 @@ class DocumentContent:
 
 
 @dataclass
+class ParsedSection:
+    """Represents a parsed section with optional confidence."""
+
+    label: str
+    content: Dict[str, Any]
+    confidence: Optional[float] = None
+
+
+ParsedResume = Dict[str, Any]
+
+
+@dataclass
 class TokenEmbedding:
     """Container linking a token to its contextual embedding."""
 
