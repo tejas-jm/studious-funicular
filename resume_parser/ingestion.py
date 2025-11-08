@@ -95,7 +95,6 @@ def _post_process_tokens(tokens: Iterable[Token]) -> List[Token]:
         cleaned_tokens.append(token)
     return cleaned_tokens
 
-
 def extract_docx_content(file_path: str, config: IngestionConfig) -> DocumentContent:
     """Extract tokens from a DOCX/DOC file using python-docx.
 
@@ -136,8 +135,7 @@ def extract_docx_content(file_path: str, config: IngestionConfig) -> DocumentCon
     page_content = PageContent(metadata=page_metadata, tokens=_post_process_tokens(tokens))
 
     return DocumentContent(pages=[page_content], raw_text="\n".join(raw_text_lines), file_path=file_path)
-
-
+  
 def _perform_easyocr(page_image: Image.Image, config: IngestionConfig, page_number: int) -> List[Token]:
     if easyocr is None:
         raise ImportError("easyocr is required for OCR on scanned PDFs")
@@ -169,7 +167,6 @@ def extract_pdf_content(file_path: str, config: IngestionConfig) -> DocumentCont
 
     Falls back to OCR for scanned PDFs when no text is detected.
     """
-
     pages: List[PageContent] = []
     raw_text_lines: List[str] = []
 
@@ -237,7 +234,6 @@ def extract_pdf_content(file_path: str, config: IngestionConfig) -> DocumentCont
             pages.append(page_content)
 
     return DocumentContent(pages=pages, raw_text="\n".join(raw_text_lines), file_path=file_path)
-
 
 def ingest_document(file_path: str, config: Optional[IngestionConfig] = None) -> DocumentContent:
     """Read *file_path* and return the normalized document content."""

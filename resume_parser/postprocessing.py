@@ -7,7 +7,6 @@ import re
 from collections import defaultdict
 from datetime import datetime
 from typing import Dict, Iterable, List, Optional, Tuple
-
 from .types import DocumentContent, ParsedResume, Token, TokenEmbedding
 
 LOGGER = logging.getLogger(__name__)
@@ -17,6 +16,7 @@ DATE_PATTERNS = [
     re.compile(r"(?P<year>\d{4})(?:[-/](?P<month>\d{1,2}))?"),
 ]
 DATE_RANGE_PATTERN = re.compile(r"(?P<start>[^-–]+)[-–](?P<end>.+)")
+
 SECTION_KEYWORDS = {
     "education": ["education", "academic", "university", "college"],
     "work_experience": ["experience", "employment", "career", "work history"],
@@ -49,7 +49,6 @@ def normalize_date(text: str) -> Optional[str]:
         month = match.groupdict().get("month")
         if month:
             try:
-                month_number = datetime.strptime(month[:3], "%b").month
                 return f"{year}-{month_number:02d}"
             except ValueError:
                 continue
@@ -112,7 +111,6 @@ def group_tokens_by_line(tokens: Iterable[Token]) -> Dict[int, List[Token]]:
         lines[int(line_index)].append(token)
     return dict(sorted(lines.items()))
 
-
 def detect_sections(document: DocumentContent) -> Dict[str, List[Token]]:
     sections: Dict[str, List[Token]] = defaultdict(list)
     current_section = "other_sections"
@@ -129,7 +127,6 @@ def detect_sections(document: DocumentContent) -> Dict[str, List[Token]]:
             continue
         sections[current_section].append(token)
     return sections
-
 
 def build_work_entries(tokens: List[Token]) -> List[Dict[str, object]]:
     lines = group_tokens_by_line(tokens)

@@ -94,7 +94,6 @@ The pipeline produces an object matching the schema below. Optional fields may b
   "meta": {}
 }
 ```
-
 ## Limitations & Future Work
 - The LayoutLMv3 model is used without fine-tuning; expect noisy predictions.
 - DOC ingestion lacks precise layout metadata because DOCX does not expose absolute positions.
