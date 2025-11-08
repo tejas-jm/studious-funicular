@@ -3,25 +3,12 @@
 from __future__ import annotations
 
 import logging
-from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Optional, Tuple, TYPE_CHECKING
+from typing import Iterable, List, Optional, Tuple
 
-try:  # pragma: no cover - optional dependency
-    import pdfplumber  # type: ignore
-except Exception:  # pragma: no cover
-    pdfplumber = None
-
-try:  # pragma: no cover - optional dependency
-    from PIL import Image  # type: ignore
-except Exception:  # pragma: no cover
-    Image = None  # type: ignore
-
-if TYPE_CHECKING:  # pragma: no cover
-    from PIL import Image as PILImage
-else:  # pragma: no cover
-    PILImage = object
+import pdfplumber
+from PIL import Image
 
 try:
     from pdf2image import convert_from_path  # type: ignore
@@ -47,7 +34,7 @@ from .types import BoundingBox, DocumentContent, PageContent, PageMetadata, Toke
 
 LOGGER = logging.getLogger(__name__)
 
-EXTENSION_MAP = {".pdf": "pdf", ".docx": "docx", ".doc": "doc"}
+SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".doc"}
 
 
 @dataclass
@@ -68,9 +55,9 @@ def detect_file_type(file_path: str) -> str:
     """
 
     extension = Path(file_path).suffix.lower()
-    if extension not in EXTENSION_MAP:
+    if extension not in SUPPORTED_EXTENSIONS:
         raise ValueError(f"Unsupported file type: {extension}")
-    return EXTENSION_MAP[extension]
+    return extension
 
 
 def normalize_bbox(
@@ -105,32 +92,8 @@ def _post_process_tokens(tokens: Iterable[Token]) -> List[Token]:
         # unify whitespace
         text = " ".join(text.split())
         token.text = text
-        token.metadata.setdefault("column_id", 0)
         cleaned_tokens.append(token)
     return cleaned_tokens
-
-
-def _group_tokens_by_line(tokens: Iterable[Token]) -> List[List[Token]]:
-    grouped: defaultdict[int, List[Token]] = defaultdict(list)
-    for token in tokens:
-        line_idx = token.metadata.get("line") if isinstance(token.metadata, dict) else None
-        if line_idx is None:
-            line_idx = int(token.bbox.y0 // 10)
-        grouped[int(line_idx)].append(token)
-    lines: List[List[Token]] = []
-    for _, line_tokens in sorted(grouped.items()):
-        lines.append(sorted(line_tokens, key=lambda item: item.bbox.x0))
-    return lines
-
-
-def _lines_from_tokens(tokens: Iterable[Token]) -> List[str]:
-    lines = []
-    for line_tokens in _group_tokens_by_line(tokens):
-        text = " ".join(token.text for token in line_tokens).strip()
-        if text:
-            lines.append(text)
-    return lines
-
 
 def extract_docx_content(file_path: str, config: IngestionConfig) -> DocumentContent:
     """Extract tokens from a DOCX/DOC file using python-docx.
@@ -172,13 +135,10 @@ def extract_docx_content(file_path: str, config: IngestionConfig) -> DocumentCon
     page_content = PageContent(metadata=page_metadata, tokens=_post_process_tokens(tokens))
 
     return DocumentContent(pages=[page_content], raw_text="\n".join(raw_text_lines), file_path=file_path)
-
-
-def _perform_easyocr(page_image: "PILImage", config: IngestionConfig, page_number: int) -> List[Token]:
+  
+def _perform_easyocr(page_image: Image.Image, config: IngestionConfig, page_number: int) -> List[Token]:
     if easyocr is None:
         raise ImportError("easyocr is required for OCR on scanned PDFs")
-    if Image is None:
-        raise ImportError("Pillow is required for OCR on scanned PDFs")
 
     reader = easyocr.Reader([config.ocr_language], gpu=False)  # heavy operation; cache outside in prod
     width, height = page_image.size
@@ -207,10 +167,6 @@ def extract_pdf_content(file_path: str, config: IngestionConfig) -> DocumentCont
 
     Falls back to OCR for scanned PDFs when no text is detected.
     """
-
-    if pdfplumber is None:
-        raise ImportError("pdfplumber is required to parse PDF files")
-
     pages: List[PageContent] = []
     raw_text_lines: List[str] = []
 
@@ -279,84 +235,6 @@ def extract_pdf_content(file_path: str, config: IngestionConfig) -> DocumentCont
 
     return DocumentContent(pages=pages, raw_text="\n".join(raw_text_lines), file_path=file_path)
 
-
-def remove_headers_footers(
-    document: DocumentContent,
-    region_height: int = 80,
-    min_repeats: int = 2,
-) -> DocumentContent:
-    """Remove repeated header and footer lines across pages.
-
-    Args:
-        document: Parsed document to clean.
-        region_height: Height in normalized coordinates (0-1000) considered header/footer.
-        min_repeats: Minimum number of pages a line must appear on to be removed.
-    """
-
-    if not document.pages:
-        return document
-
-    header_counts: defaultdict[str, int] = defaultdict(int)
-    footer_counts: defaultdict[str, int] = defaultdict(int)
-    header_maps: List[dict[str, List[Token]]] = []
-    footer_maps: List[dict[str, List[Token]]] = []
-
-    for page in document.pages:
-        tokens = page.tokens
-        header_tokens = [token for token in tokens if token.bbox.y0 <= region_height]
-        footer_tokens = [token for token in tokens if token.bbox.y1 >= 1000 - region_height]
-
-        header_map: dict[str, List[Token]] = {}
-        footer_map: dict[str, List[Token]] = {}
-
-        for line_tokens in _group_tokens_by_line(header_tokens):
-            text = " ".join(token.text for token in line_tokens).strip()
-            if text:
-                header_counts[text] += 1
-                header_map.setdefault(text, []).extend(line_tokens)
-
-        for line_tokens in _group_tokens_by_line(footer_tokens):
-            text = " ".join(token.text for token in line_tokens).strip()
-            if text:
-                footer_counts[text] += 1
-                footer_map.setdefault(text, []).extend(line_tokens)
-
-        header_maps.append(header_map)
-        footer_maps.append(footer_map)
-
-    repeated_headers = {text for text, count in header_counts.items() if count >= min_repeats}
-    repeated_footers = {text for text, count in footer_counts.items() if count >= min_repeats}
-
-    for page, header_map, footer_map in zip(document.pages, header_maps, footer_maps):
-        tokens_to_remove = set()
-        for text in repeated_headers:
-            tokens_to_remove.update(id(token) for token in header_map.get(text, []))
-        for text in repeated_footers:
-            tokens_to_remove.update(id(token) for token in footer_map.get(text, []))
-        if tokens_to_remove:
-            page.tokens = [token for token in page.tokens if id(token) not in tokens_to_remove]
-
-    if document.raw_text:
-        cleaned_lines: List[str] = []
-        for page in document.pages:
-            cleaned_lines.extend(_lines_from_tokens(page.tokens))
-        document.raw_text = "\n".join(cleaned_lines)
-
-    return document
-
-
-def normalize_document_bboxes(document: DocumentContent, scale: int = 1000) -> DocumentContent:
-    """Clamp token bounding boxes to the provided scale."""
-
-    for page in document.pages:
-        for token in page.tokens:
-            token.bbox.x0 = max(0, min(scale, token.bbox.x0))
-            token.bbox.y0 = max(0, min(scale, token.bbox.y0))
-            token.bbox.x1 = max(0, min(scale, token.bbox.x1))
-            token.bbox.y1 = max(0, min(scale, token.bbox.y1))
-    return document
-
-
 def ingest_document(file_path: str, config: Optional[IngestionConfig] = None) -> DocumentContent:
     """Read *file_path* and return the normalized document content."""
 
@@ -364,15 +242,9 @@ def ingest_document(file_path: str, config: Optional[IngestionConfig] = None) ->
         config = IngestionConfig()
 
     file_type = detect_file_type(file_path)
-    if file_type in {"doc", "docx"}:
+    if file_type in {".doc", ".docx"}:
         return extract_docx_content(file_path, config)
-    if file_type == "pdf":
+    if file_type == ".pdf":
         return extract_pdf_content(file_path, config)
 
     raise ValueError(f"Unsupported file type: {file_type}")
-
-
-def load_document(file_path: str, config: Optional[IngestionConfig] = None) -> DocumentContent:
-    """Public alias matching the high-level API name used in documentation."""
-
-    return ingest_document(file_path, config)

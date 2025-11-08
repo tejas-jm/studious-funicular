@@ -6,8 +6,8 @@ An end-to-end resume parsing pipeline that ingests DOCX/DOC/PDF (including scann
 - File-type detection with dedicated ingestion paths for DOC/DOCX (python-docx/docx2txt) and PDF (pdfplumber with OCR fallback).
 - Normalization of word-level bounding boxes for LayoutLMv3 compatibility.
 - LayoutLMv3 inference without fine-tuning for contextual embeddings and downstream heuristics.
-- Heuristic post-processing for section segmentation, date normalization, skill deduplication, and structured field extraction.
-- Dataclass-backed schema describing the deeply nested JSON output (contact, education, experience, skills, certifications, projects, publications, languages, and other sections).
+- Heuristic post-processing for section segmentation, date normalization, and skill deduplication.
+- JSON output schema covering contact information, education, work experience, skills, certifications, projects, publications, languages, and other sections.
 - Notebook and CLI examples for running the pipeline end-to-end.
 
 ## Installation
@@ -28,17 +28,10 @@ sudo apt-get install poppler-utils  # required by pdf2image
 ### Python API
 
 ```python
-import json
+from resume_parser import parse_resume
 
-from resume_parser import ResumeParser, parse_resume
-
-payload = parse_resume("/path/to/resume.pdf")
-print(json.dumps(payload, indent=2, ensure_ascii=False))
-
-# Need the dataclass-backed schema? Use the parser directly.
-parser = ResumeParser()
-resume_model = parser.parse("/path/to/resume.pdf")
-print(resume_model.contact.email)
+result = parse_resume("/path/to/resume.pdf")
+print(result)
 ```
 
 ### Command-Line Interface
@@ -49,7 +42,7 @@ python examples/run_pipeline.py /path/to/resume.pdf --output parsed.json
 
 ### Notebook Demo
 
-Open `notebooks/resume_parser_demo.ipynb` (or upload it to Google Colab) and follow the instructions to upload sample resumes and inspect the JSON output produced by the new schema-aware pipeline.
+Open `notebooks/resume_parser_demo.ipynb` (or upload it to Google Colab) and follow the instructions to upload sample resumes and inspect the JSON output.
 
 ## JSON Schema
 
@@ -58,93 +51,49 @@ The pipeline produces an object matching the schema below. Optional fields may b
 ```json
 {
   "contact": {
-    "name": "Ada Lovelace",
-    "email": "ada@example.com",
-    "phone": "+44 20 1234 5678",
-    "website": "https://adalovelace.dev",
-    "address": "12 Analytical Engine Way, London",
-    "raw": "Ada Lovelace\nada@example.com\n+44 20 1234 5678"
+    "email": "",
+    "phone": "",
+    "website": "",
+    "raw": ""
   },
   "education": [
     {
-      "institution": "University of London",
-      "degree": "Bachelor of Science",
-      "field_of_study": "Mathematics",
-      "start_date": "1833-01",
-      "end_date": "1835-12",
-      "grade": null,
-      "extra": {}
+      "institution": "",
+      "degree": "",
+      "field_of_study": "",
+      "start_date": "YYYY-MM",
+      "end_date": "YYYY-MM",
+      "grade": ""
     }
   ],
   "work_experience": [
     {
-      "company": "Analytical Engines Ltd",
-      "position": "Algorithm Designer",
-      "start_date": "1842-01",
-      "end_date": "1845-06",
-      "duration_months": 41,
+      "organization": "",
+      "start_date": "YYYY-MM",
+      "end_date": "YYYY-MM",
+      "duration_months": 0,
       "description": [
-        "Drafted the first published algorithm.",
-        "Collaborated with Charles Babbage on engine design notes."
-      ],
-      "extra": {}
+        ""
+      ]
     }
   ],
-  "skills": [
-    "Mathematics",
-    "Analytical Engine",
-    "Technical Writing"
-  ],
+  "skills": [""],
   "certifications": [
-    {
-      "name": "Royal Society Fellowship",
-      "issuer": "Royal Society",
-      "date": "1843-01",
-      "extra": {}
-    }
+    {"name": "", "issuer": "", "date": ""}
   ],
   "projects": [
-    {
-      "name": "Engine Notes",
-      "description": "Annotated plans and notes for the Analytical Engine.",
-      "technologies": [
-        "Mathematics",
-        "Mechanical Computing"
-      ],
-      "date": null,
-      "extra": {}
-    }
+    {"name": "", "description": "", "technologies": []}
   ],
   "publications": [
-    {
-      "title": "Sketch of the Analytical Engine",
-      "publication": null,
-      "date": null,
-      "url": "https://example.com/analytical-engine",
-      "extra": {}
-    }
+    {"title": "", "date": "", "link": ""}
   ],
-  "languages": [
-    {
-      "language": "English",
-      "fluency": "Native"
-    }
-  ],
+  "languages": [""],
   "other_sections": [
-    {
-      "label": "Volunteer Work",
-      "content": "Advocated for early computing research."
-    }
+    {"label": "", "content": ""}
   ],
-  "raw_text": "...original document text...",
-  "meta": {
-    "token_embeddings": 1234
-  }
+  "meta": {}
 }
 ```
-
-The schema is implemented with Python dataclasses that perform lightweight runtime validation of dates, lists, and optional fields.
-
 ## Limitations & Future Work
 - The LayoutLMv3 model is used without fine-tuning; expect noisy predictions.
 - DOC ingestion lacks precise layout metadata because DOCX does not expose absolute positions.

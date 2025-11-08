@@ -6,8 +6,7 @@ import argparse
 import json
 import logging
 from pathlib import Path
-
-from resume_parser import ResumeParser, parse_resume
+from resume_parser import parse_resume
 
 logging.basicConfig(level=logging.INFO)
 
@@ -17,20 +16,12 @@ def main() -> None:
     parser.add_argument("file", type=Path, help="Path to the resume file (PDF/DOCX/DOC)")
     parser.add_argument("--output", type=Path, default=None, help="Optional path to save the JSON output")
     args = parser.parse_args()
-
-    payload = parse_resume(str(args.file))
-    json_payload = json.dumps(payload, indent=2, ensure_ascii=False)
-    print(json_payload)
+    resume_json = parse_resume(str(args.file))
+    print(json.dumps(resume_json, indent=2, ensure_ascii=False))
 
     if args.output:
-        args.output.write_text(json_payload)
+        args.output.write_text(json.dumps(resume_json, indent=2, ensure_ascii=False))
         logging.info("Saved output to %s", args.output)
-
-    # Demonstrate access to the dataclass-based schema when needed.
-    parser_instance = ResumeParser()
-    resume_model = parser_instance.parse(str(args.file))
-    logging.info("Parsed %s education entries", len(resume_model.education))
-
 
 if __name__ == "__main__":
     main()
