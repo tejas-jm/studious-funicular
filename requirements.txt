@@ -1,0 +1,8 @@
+torch
+transformers
+pdfplumber
+python-docx
+docx2txt
+easyocr
+pdf2image
+Pillow
