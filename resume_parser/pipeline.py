@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import Optional
+
 from . import ingestion, inference, postprocessing
 from .types import DocumentContent, ParsedResume
 
@@ -44,6 +45,7 @@ class ResumeParser:
         document = self.load_document(file_path)
         embeddings = self.run_inference(document)
         return self.post_process(document, embeddings)
+
 
 def parse_resume(file_path: str) -> ParsedResume:
     """Convenience function to parse a resume into structured JSON."""

@@ -5,9 +5,11 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional
+
 import torch
 from PIL import Image
 from transformers import LayoutLMv3Model, LayoutLMv3Processor
+
 from .types import DocumentContent, PageContent, TokenEmbedding
 
 LOGGER = logging.getLogger(__name__)
