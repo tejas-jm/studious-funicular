@@ -6,8 +6,7 @@ import argparse
 import json
 import logging
 from pathlib import Path
-
-from resume_parser import ResumeParser, parse_resume
+from resume_parser import parse_resume
 
 logging.basicConfig(level=logging.INFO)
 
@@ -17,7 +16,6 @@ def main() -> None:
     parser.add_argument("file", type=Path, help="Path to the resume file (PDF/DOCX/DOC)")
     parser.add_argument("--output", type=Path, default=None, help="Optional path to save the JSON output")
     args = parser.parse_args()
-
     payload = parse_resume(str(args.file))
     json_payload = json.dumps(payload, indent=2, ensure_ascii=False)
     print(json_payload)

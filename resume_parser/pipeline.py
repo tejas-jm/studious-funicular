@@ -5,11 +5,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import Optional
-
-from . import ingestion, inference, layout_utils, postprocessing
-from .slm_refine import refine_resume_json
-from .schema import ResumeOutput
-from .types import DocumentContent
+from . import ingestion, inference, postprocessing
+from .types import DocumentContent, ParsedResume
 
 LOGGER = logging.getLogger(__name__)
 
@@ -42,30 +39,19 @@ class ResumeParser:
         LOGGER.debug("Obtained %s token embeddings", len(embeddings))
         return embeddings
 
-    def post_process(self, document: DocumentContent, embeddings) -> ResumeOutput:
+    def post_process(self, document: DocumentContent, embeddings) -> ParsedResume:
         LOGGER.info("Linking entities into structured resume")
         resume = postprocessing.link_entities(document, embeddings)
         return resume
 
-    def parse_with_details(self, file_path: str) -> tuple[ResumeOutput, DocumentContent]:
-        """Parse the resume and return both the structured output and document."""
-
-        resolved_path = str(Path(file_path).expanduser().resolve())
-        document = self.load_document(resolved_path)
+    def parse(self, file_path: str) -> ParsedResume:
+        document = self.load_document(file_path)
         embeddings = self.run_inference(document)
-        resume = self.post_process(document, embeddings)
-        return resume, document
-
-    def parse(self, file_path: str) -> ResumeOutput:
-        resume, _ = self.parse_with_details(file_path)
-        return resume
+        return self.post_process(document, embeddings)
 
 
-def parse_resume(file_path: str) -> dict:
+def parse_resume(file_path: str) -> ParsedResume:
     """Convenience function to parse a resume into structured JSON."""
 
     parser = ResumeParser()
-    resume, document = parser.parse_with_details(file_path)
-    baseline = resume.to_dict()
-    refined = refine_resume_json(baseline, document.raw_text)
-    return refined
+    return parser.parse(str(Path(file_path).expanduser().resolve()))

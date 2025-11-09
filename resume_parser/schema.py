@@ -8,25 +8,14 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 
-def _normalize_present(value: str) -> str:
-    if value.lower() == "present":
-        return "Present"
-    return value
-
-
 def _validate_date(value: Optional[str]) -> Optional[str]:
-    if value is None:
-        return None
-    normalized = value.strip()
-    if not normalized:
-        return None
-    if normalized.lower() == "present":
-        return "Present"
-    if len(normalized) == 4:
-        datetime.strptime(normalized, "%Y")
-        return normalized
-    datetime.strptime(normalized, "%Y-%m")
-    return normalized
+    if value is None or value == "present":
+        return value
+    if len(value) == 4:
+        datetime.strptime(value, "%Y")
+        return value
+    datetime.strptime(value, "%Y-%m")
+    return value
 
 
 def _ensure_dict(value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
@@ -41,7 +30,7 @@ class Contact:
     email: Optional[str] = None
     phone: Optional[str] = None
     website: Optional[str] = None
-    location: Optional[str] = None
+    address: Optional[str] = None
     raw: Optional[str] = None
 
 
@@ -55,15 +44,14 @@ class Education:
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     grade: Optional[str] = None
-    location: Optional[str] = None
+    extra: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.start_date:
             self.start_date = _validate_date(self.start_date)
         if self.end_date:
-            if isinstance(self.end_date, str):
-                self.end_date = _normalize_present(self.end_date)
             self.end_date = _validate_date(self.end_date)
+        self.extra = _ensure_dict(self.extra)
 
 
 @dataclass
@@ -75,8 +63,8 @@ class WorkExperience:
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     duration_months: Optional[int] = None
-    location: Optional[str] = None
     description: List[str] = field(default_factory=list)
+    extra: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.start_date:
@@ -104,34 +92,35 @@ class Certification:
     name: Optional[str] = None
     issuer: Optional[str] = None
     date: Optional[str] = None
+    extra: Dict[str, Any] = field(default_factory=dict)
+      
+    def __post_init__(self) -> None:
+        if self.date:
+            try:
+                self.date = _validate_date(self.date)
+            except ValueError:
+                pass
+        self.extra = _ensure_dict(self.extra)
+
+
+@dataclass
+class Project:
+    """Project entry including technologies and description."""
+
+    name: Optional[str] = None
+    description: Optional[str] = None
+    technologies: List[str] = field(default_factory=list)
+    date: Optional[str] = None
+    extra: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.date:
             try:
                 self.date = _validate_date(self.date)
             except ValueError:
-                self.date = self.date
-
-
-@dataclass
-class Project:
-    """Project entry including role, dates, and technologies."""
-
-    name: Optional[str] = None
-    role: Optional[str] = None
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    description: Optional[str] = None
-    technologies: List[str] = field(default_factory=list)
-
-    def __post_init__(self) -> None:
-        if self.start_date:
-            self.start_date = _validate_date(self.start_date)
-        if self.end_date:
-            if isinstance(self.end_date, str):
-                self.end_date = _normalize_present(self.end_date)
-            self.end_date = _validate_date(self.end_date)
-        self.technologies = [tech.strip() for tech in self.technologies if tech and tech.strip()]
+                pass
+        self.extra = _ensure_dict(self.extra)
+        self.technologies = [tech.strip() for tech in self.technologies if tech.strip()]
 
 
 @dataclass
@@ -139,24 +128,25 @@ class Publication:
     """Publication entry for articles, papers, etc."""
 
     title: Optional[str] = None
-    venue: Optional[str] = None
+    publication: Optional[str] = None
     date: Optional[str] = None
-    description: Optional[str] = None
+    url: Optional[str] = None
+    extra: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.date:
             try:
                 self.date = _validate_date(self.date)
             except ValueError:
-                self.date = self.date
+                pass
+        self.extra = _ensure_dict(self.extra)
 
 
 @dataclass
 class Language:
     """Language proficiency entry."""
-
-    name: Optional[str] = None
-    proficiency: Optional[str] = None
+    language: Optional[str] = None
+    fluency: Optional[str] = None
 
 
 @dataclass
@@ -185,13 +175,14 @@ class ResumeOutput:
     contact: Contact = field(default_factory=Contact)
     education: List[Education] = field(default_factory=list)
     work_experience: List[WorkExperience] = field(default_factory=list)
-    skills: List[Skill] = field(default_factory=list)
+    skills: List[str] = field(default_factory=list)
     certifications: List[Certification] = field(default_factory=list)
     projects: List[Project] = field(default_factory=list)
     publications: List[Publication] = field(default_factory=list)
     languages: List[Language] = field(default_factory=list)
     other_sections: List[OtherSection] = field(default_factory=list)
-    meta: Meta = field(default_factory=Meta)
+    raw_text: Optional[str] = None
+    meta: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.education = [item if isinstance(item, Education) else Education(**item) for item in self.education]
@@ -202,21 +193,22 @@ class ResumeOutput:
         self.publications = [item if isinstance(item, Publication) else Publication(**item) for item in self.publications]
         self.languages = [item if isinstance(item, Language) else Language(**item) for item in self.languages]
         self.other_sections = [item if isinstance(item, OtherSection) else OtherSection(**item) for item in self.other_sections]
-        if not isinstance(self.meta, Meta):
-            self.meta = Meta(**(self.meta or {}))
+        self.skills = [skill.strip() for skill in self.skills if skill]
+        self.meta = _ensure_dict(self.meta)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "contact": asdict(self.contact),
             "education": [asdict(item) for item in self.education],
             "work_experience": [asdict(item) for item in self.work_experience],
-            "skills": [asdict(item) for item in self.skills],
+            "skills": list(self.skills),
             "certifications": [asdict(item) for item in self.certifications],
             "projects": [asdict(item) for item in self.projects],
             "publications": [asdict(item) for item in self.publications],
             "languages": [asdict(item) for item in self.languages],
             "other_sections": [asdict(item) for item in self.other_sections],
-            "meta": self.meta.to_dict(),
+            "raw_text": self.raw_text,
+            "meta": dict(self.meta),
         }
 
     def json(self, indent: int = 2, ensure_ascii: bool = False) -> str:
@@ -235,6 +227,7 @@ class ResumeOutput:
             publications=payload.get("publications", []),
             languages=payload.get("languages", []),
             other_sections=payload.get("other_sections", []),
+            raw_text=payload.get("raw_text"),
             meta=payload.get("meta", {}),
         )
 
@@ -247,6 +240,8 @@ class ResumeOutput:
             _ = item.end_date
         if not isinstance(self.skills, list):
             raise TypeError("skills must be a list")
+        if not isinstance(self.meta, dict):
+            raise TypeError("meta must be a dictionary")
 
 
 __all__ = [

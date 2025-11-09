@@ -9,6 +9,7 @@ An end-to-end resume parsing pipeline that ingests DOCX/DOC/PDF (including scann
 - Heuristic post-processing for section segmentation, date normalization, skill deduplication, and structured field extraction.
 - Dataclass-backed schema describing the deeply nested JSON output (contact, education, experience, skills, certifications, projects, publications, languages, and other sections).
 - Optional SLM-powered refinement step that normalizes the heuristic output into schema-valid JSON without hallucinating new data.
+
 - Notebook and CLI examples for running the pipeline end-to-end.
 
 ## Installation
@@ -29,17 +30,10 @@ sudo apt-get install poppler-utils  # required by pdf2image
 ### Python API
 
 ```python
-import json
+from resume_parser import parse_resume
 
-from resume_parser import ResumeParser, parse_resume
-
-payload = parse_resume("/path/to/resume.pdf")
-print(json.dumps(payload, indent=2, ensure_ascii=False))
-
-# Need the dataclass-backed schema? Use the parser directly.
-parser = ResumeParser()
-resume_model = parser.parse("/path/to/resume.pdf")
-print(resume_model.contact.email)
+result = parse_resume("/path/to/resume.pdf")
+print(result)
 ```
 
 ### Command-Line Interface
@@ -51,6 +45,7 @@ python examples/run_pipeline.py /path/to/resume.pdf --output parsed.json
 ### Notebook Demo
 
 Open `notebooks/resume_parser_demo.ipynb` (or upload it to Google Colab) and follow the instructions to upload sample resumes and inspect the JSON output produced by the schema-aware pipeline and optional SLM normalizer.
+
 
 ## JSON Schema
 

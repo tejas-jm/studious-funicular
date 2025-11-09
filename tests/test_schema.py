@@ -14,9 +14,7 @@ spec.loader.exec_module(schema)
 
 Contact = schema.Contact
 Education = schema.Education
-Meta = schema.Meta
 ResumeOutput = schema.ResumeOutput
-Skill = schema.Skill
 WorkExperience = schema.WorkExperience
 
 
@@ -34,17 +32,15 @@ def test_resume_output_serialization_roundtrip():
                 description=["Worked on projects."],
             )
         ],
-        skills=[Skill(name="Python"), Skill(name="Data Analysis")],
-        meta=Meta(source="resume.pdf"),
+        skills=["Python", "Data Analysis"],
     )
 
     payload = json.loads(resume.json())
     assert payload["contact"]["email"] == "test@example.com"
     assert payload["education"][0]["institution"] == "Test University"
     assert payload["work_experience"][0]["duration_months"] == 12
-    assert payload["skills"][0]["name"] == "Python"
     assert payload["projects"] == []
-    assert payload["meta"]["source"] == "resume.pdf"
+    assert payload["raw_text"] is None
 
 
 def test_resume_output_missing_optional_fields():
@@ -58,10 +54,11 @@ def test_resume_output_missing_optional_fields():
         "publications": [],
         "languages": [],
         "other_sections": [],
+        "raw_text": None,
         "meta": {},
     }
 
     resume = ResumeOutput.from_dict(payload)
     assert resume.contact.email is None
     assert resume.skills == []
-    assert resume.meta.source is None
+    assert resume.meta == {}

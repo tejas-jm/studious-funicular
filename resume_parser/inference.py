@@ -5,23 +5,9 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional
-
-try:  # pragma: no cover - optional dependency
-    import torch  # type: ignore
-except Exception:  # pragma: no cover
-    torch = None  # type: ignore
-
-try:  # pragma: no cover - optional dependency
-    from PIL import Image  # type: ignore
-except Exception:  # pragma: no cover
-    Image = None  # type: ignore
-
-try:  # pragma: no cover - optional dependency
-    from transformers import LayoutLMv3Model, LayoutLMv3Processor  # type: ignore
-except Exception:  # pragma: no cover
-    LayoutLMv3Model = None  # type: ignore
-    LayoutLMv3Processor = None  # type: ignore
-
+import torch
+from PIL import Image
+from transformers import LayoutLMv3Model, LayoutLMv3Processor
 from .types import DocumentContent, PageContent, TokenEmbedding
 
 LOGGER = logging.getLogger(__name__)

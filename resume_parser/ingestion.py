@@ -7,21 +7,11 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple, TYPE_CHECKING
-
-try:  # pragma: no cover - optional dependency
-    import pdfplumber  # type: ignore
-except Exception:  # pragma: no cover
-    pdfplumber = None
-
-try:  # pragma: no cover - optional dependency
-    from PIL import Image  # type: ignore
-except Exception:  # pragma: no cover
-    Image = None  # type: ignore
-
-if TYPE_CHECKING:  # pragma: no cover
-    from PIL import Image as PILImage
-else:  # pragma: no cover
-    PILImage = object
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Iterable, List, Optional, Tuple
+import pdfplumber
+from PIL import Image
 
 try:
     from pdf2image import convert_from_path  # type: ignore
@@ -47,7 +37,7 @@ from .types import BoundingBox, DocumentContent, PageContent, PageMetadata, Toke
 
 LOGGER = logging.getLogger(__name__)
 
-EXTENSION_MAP = {".pdf": "pdf", ".docx": "docx", ".doc": "doc"}
+SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".doc"}
 
 
 @dataclass
@@ -68,9 +58,9 @@ def detect_file_type(file_path: str) -> str:
     """
 
     extension = Path(file_path).suffix.lower()
-    if extension not in EXTENSION_MAP:
+    if extension not in SUPPORTED_EXTENSIONS:
         raise ValueError(f"Unsupported file type: {extension}")
-    return EXTENSION_MAP[extension]
+    return extension
 
 
 def normalize_bbox(
@@ -131,7 +121,6 @@ def _lines_from_tokens(tokens: Iterable[Token]) -> List[str]:
             lines.append(text)
     return lines
 
-
 def extract_docx_content(file_path: str, config: IngestionConfig) -> DocumentContent:
     """Extract tokens from a DOCX/DOC file using python-docx.
 
@@ -174,11 +163,9 @@ def extract_docx_content(file_path: str, config: IngestionConfig) -> DocumentCon
     return DocumentContent(pages=[page_content], raw_text="\n".join(raw_text_lines), file_path=file_path)
 
 
-def _perform_easyocr(page_image: "PILImage", config: IngestionConfig, page_number: int) -> List[Token]:
+def _perform_easyocr(page_image: Image.Image, config: IngestionConfig, page_number: int) -> List[Token]:
     if easyocr is None:
         raise ImportError("easyocr is required for OCR on scanned PDFs")
-    if Image is None:
-        raise ImportError("Pillow is required for OCR on scanned PDFs")
 
     reader = easyocr.Reader([config.ocr_language], gpu=False)  # heavy operation; cache outside in prod
     width, height = page_image.size
@@ -207,10 +194,6 @@ def extract_pdf_content(file_path: str, config: IngestionConfig) -> DocumentCont
 
     Falls back to OCR for scanned PDFs when no text is detected.
     """
-
-    if pdfplumber is None:
-        raise ImportError("pdfplumber is required to parse PDF files")
-
     pages: List[PageContent] = []
     raw_text_lines: List[str] = []
 
@@ -364,15 +347,9 @@ def ingest_document(file_path: str, config: Optional[IngestionConfig] = None) ->
         config = IngestionConfig()
 
     file_type = detect_file_type(file_path)
-    if file_type in {"doc", "docx"}:
+    if file_type in {".doc", ".docx"}:
         return extract_docx_content(file_path, config)
-    if file_type == "pdf":
+    if file_type == ".pdf":
         return extract_pdf_content(file_path, config)
 
     raise ValueError(f"Unsupported file type: {file_type}")
-
-
-def load_document(file_path: str, config: Optional[IngestionConfig] = None) -> DocumentContent:
-    """Public alias matching the high-level API name used in documentation."""
-
-    return ingest_document(file_path, config)
