@@ -5,11 +5,9 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional
-
 import torch
 from PIL import Image
 from transformers import LayoutLMv3Model, LayoutLMv3Processor
-
 from .types import DocumentContent, PageContent, TokenEmbedding
 
 LOGGER = logging.getLogger(__name__)
@@ -42,8 +40,14 @@ class LayoutLMv3Inference:
 
     def __init__(self, config: Optional[InferenceConfig] = None) -> None:
         self.config = config or InferenceConfig()
+        if torch is None:
+            raise ImportError("PyTorch is required for LayoutLMv3 inference")
         self.device = self.config.device or ("cuda" if torch.cuda.is_available() else "cpu")
         LOGGER.info("Using device %s for LayoutLMv3", self.device)
+        if LayoutLMv3Processor is None or LayoutLMv3Model is None:
+            raise ImportError("transformers is required for LayoutLMv3 inference")
+        if Image is None:
+            raise ImportError("Pillow is required for LayoutLMv3 inference")
         self.processor = LayoutLMv3Processor.from_pretrained(self.config.model_name, apply_ocr=False)
         self.model = LayoutLMv3Model.from_pretrained(self.config.model_name)
         self.model.to(self.device)

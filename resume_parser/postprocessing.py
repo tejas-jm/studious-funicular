@@ -7,16 +7,22 @@ import re
 from collections import defaultdict
 from datetime import datetime
 from typing import Dict, Iterable, List, Optional, Tuple
-
 from .types import DocumentContent, ParsedResume, Token, TokenEmbedding
 
 LOGGER = logging.getLogger(__name__)
+
 
 DATE_PATTERNS = [
     re.compile(r"(?P<month>Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\s+(?P<year>\d{4})", re.I),
     re.compile(r"(?P<year>\d{4})(?:[-/](?P<month>\d{1,2}))?"),
 ]
 DATE_RANGE_PATTERN = re.compile(r"(?P<start>[^-–]+)[-–](?P<end>.+)")
+DEGREE_PATTERN = re.compile(
+    r"(Bachelor(?:'s)?|Master(?:'s)?|B\.\s?Sc|M\.\s?Sc|B\.\s?Eng|M\.\s?Eng|MBA|Ph\.?D)",
+    re.I,
+)
+FIELD_MARKER_PATTERN = re.compile(r"(?:in|of)\s+([A-Za-z&\s]+)", re.I)
+BULLET_PATTERN = re.compile(r"^[•\-\u2022\u2023\u25E6\*]+\s*")
 SECTION_KEYWORDS = {
     "education": ["education", "academic", "university", "college"],
     "work_experience": ["experience", "employment", "career", "work history"],
@@ -113,6 +119,15 @@ def group_tokens_by_line(tokens: Iterable[Token]) -> Dict[int, List[Token]]:
     return dict(sorted(lines.items()))
 
 
+def tokens_to_lines(tokens: Iterable[Token]) -> List[str]:
+    grouped = group_tokens_by_line(tokens)
+    lines: List[str] = []
+    for _, line_tokens in grouped.items():
+        line_text = _join_tokens(line_tokens)
+        if line_text:
+            lines.append(line_text)
+    return lines
+
 def detect_sections(document: DocumentContent) -> Dict[str, List[Token]]:
     sections: Dict[str, List[Token]] = defaultdict(list)
     current_section = "other_sections"
@@ -129,7 +144,6 @@ def detect_sections(document: DocumentContent) -> Dict[str, List[Token]]:
             continue
         sections[current_section].append(token)
     return sections
-
 
 def build_work_entries(tokens: List[Token]) -> List[Dict[str, object]]:
     lines = group_tokens_by_line(tokens)

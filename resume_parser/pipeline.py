@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import Optional
-
 from . import ingestion, inference, postprocessing
 from .types import DocumentContent, ParsedResume
 
@@ -27,6 +26,10 @@ class ResumeParser:
     def load_document(self, file_path: str) -> DocumentContent:
         LOGGER.info("Ingesting document %s", file_path)
         document = ingestion.ingest_document(file_path, self.ingestion_config)
+        ingestion.normalize_document_bboxes(document, self.ingestion_config.bbox_scale)
+        ingestion.remove_headers_footers(document)
+        layout_utils.assign_columns(document)
+        layout_utils.reorder_document_tokens(document)
         LOGGER.debug("Loaded %s tokens", len(document.tokens))
         return document
 

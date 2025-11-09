@@ -70,9 +70,19 @@ class WorkExperience:
         if self.start_date:
             self.start_date = _validate_date(self.start_date)
         if self.end_date:
+            if isinstance(self.end_date, str):
+                self.end_date = _normalize_present(self.end_date)
             self.end_date = _validate_date(self.end_date)
-        self.extra = _ensure_dict(self.extra)
-        self.description = [item.strip() for item in self.description if item]
+        self.description = [item.strip() for item in self.description if item and item.strip()]
+
+
+@dataclass
+class Skill:
+    """Skill entry with optional categorisation and proficiency."""
+
+    name: Optional[str] = None
+    category: Optional[str] = None
+    proficiency: Optional[str] = None
 
 
 @dataclass
@@ -83,7 +93,7 @@ class Certification:
     issuer: Optional[str] = None
     date: Optional[str] = None
     extra: Dict[str, Any] = field(default_factory=dict)
-
+      
     def __post_init__(self) -> None:
         if self.date:
             try:
@@ -135,7 +145,6 @@ class Publication:
 @dataclass
 class Language:
     """Language proficiency entry."""
-
     language: Optional[str] = None
     fluency: Optional[str] = None
 
@@ -146,6 +155,17 @@ class OtherSection:
 
     label: Optional[str] = None
     content: Optional[str] = None
+
+
+@dataclass
+class Meta:
+    """Metadata produced during parsing and refinement."""
+
+    source: Optional[str] = None
+    notes: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {key: value for key, value in asdict(self).items() if value is not None}
 
 
 @dataclass
@@ -167,6 +187,7 @@ class ResumeOutput:
     def __post_init__(self) -> None:
         self.education = [item if isinstance(item, Education) else Education(**item) for item in self.education]
         self.work_experience = [item if isinstance(item, WorkExperience) else WorkExperience(**item) for item in self.work_experience]
+        self.skills = [item if isinstance(item, Skill) else Skill(**item) for item in self.skills]
         self.certifications = [item if isinstance(item, Certification) else Certification(**item) for item in self.certifications]
         self.projects = [item if isinstance(item, Project) else Project(**item) for item in self.projects]
         self.publications = [item if isinstance(item, Publication) else Publication(**item) for item in self.publications]
@@ -195,6 +216,7 @@ class ResumeOutput:
 
     @classmethod
     def from_dict(cls, payload: Dict[str, Any]) -> "ResumeOutput":
+        payload = dict(payload)
         return cls(
             contact=Contact(**payload.get("contact", {})),
             education=payload.get("education", []),
@@ -226,10 +248,12 @@ __all__ = [
     "Contact",
     "Education",
     "WorkExperience",
+    "Skill",
     "Certification",
     "Project",
     "Publication",
     "Language",
     "OtherSection",
+    "Meta",
     "ResumeOutput",
 ]
